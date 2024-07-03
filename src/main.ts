@@ -189,6 +189,7 @@ async function main() {
   );
 
   console.log("action: " + eventData.action);
+  console.log("event:", process.env.GITHUB_EVENT_NAME);
   // if (eventData.action === "opened" || eventData.action === "labeled") {
   diff = await getDiff(
     prDetails.owner,
