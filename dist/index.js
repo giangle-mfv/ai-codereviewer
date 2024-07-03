@@ -192,9 +192,9 @@ function main() {
         const prDetails = yield getPRDetails();
         let diff;
         const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        console.log("data: " + JSON.stringify(eventData));
         console.log("action: " + eventData.action);
         console.log("event:", process.env.GITHUB_EVENT_NAME);
-        // if (eventData.action === "opened" || eventData.action === "labeled") {
         diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
         // } else if (eventData.action === "synchronize") {
         //   const newBaseSha = eventData.before;
