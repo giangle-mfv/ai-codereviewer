@@ -297,7 +297,7 @@ async function generatePrDescription() {
   const prompt = createPRDescriptionPrompt(diff, prDetails);
   const aiResponse = await getAIResponse(prompt);
 
-  console.log("AI Response: ", JSON.stringify(aiResponse));
+  console.log("AI Response: ", aiResponse);
 
   // if (aiResponse) {
   //     await updatePullRequestDescription(

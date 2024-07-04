@@ -269,7 +269,7 @@ function generatePrDescription() {
         }
         const prompt = createPRDescriptionPrompt(diff, prDetails);
         const aiResponse = yield getAIResponse(prompt);
-        console.log("AI Response: ", JSON.stringify(aiResponse));
+        console.log("AI Response: ", aiResponse);
         // if (aiResponse) {
         //     await updatePullRequestDescription(
         //         prDetails.owner,
