@@ -114,17 +114,11 @@ ${chunk.changes
 `;
 }
 
-function createPRDescriptionPrompt(diff: string, prDetails: PRDetails): string {
+function createPRDescriptionPrompt(diff: string): string {
   return `
   Your job is reading the following git diff and suggest me a description of the Pull Request. 
   The description should be summary of what i've done, what is the output and what can be the impact to the existing code base.
   
-  Pull request title: ${prDetails.title}
-  Pull request description:
-  ---
-  ${prDetails.description}
-  ---
-
   Git diff are:
   ---
   ${diff}
@@ -294,7 +288,7 @@ async function generatePrDescription() {
     return;
   }
 
-  const prompt = createPRDescriptionPrompt(diff, prDetails);
+  const prompt = createPRDescriptionPrompt(diff);
   const aiResponse = await getAIResponse(prompt);
 
   console.log("AI Response: ", aiResponse);

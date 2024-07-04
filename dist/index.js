@@ -137,17 +137,11 @@ ${chunk.changes
 \`\`\`
 `;
 }
-function createPRDescriptionPrompt(diff, prDetails) {
+function createPRDescriptionPrompt(diff) {
     return `
   Your job is reading the following git diff and suggest me a description of the Pull Request. 
   The description should be summary of what i've done, what is the output and what can be the impact to the existing code base.
   
-  Pull request title: ${prDetails.title}
-  Pull request description:
-  ---
-  ${prDetails.description}
-  ---
-
   Git diff are:
   ---
   ${diff}
@@ -267,7 +261,7 @@ function generatePrDescription() {
             console.log("No diff found");
             return;
         }
-        const prompt = createPRDescriptionPrompt(diff, prDetails);
+        const prompt = createPRDescriptionPrompt(diff);
         const aiResponse = yield getAIResponse(prompt);
         console.log("AI Response: ", aiResponse);
         // if (aiResponse) {
