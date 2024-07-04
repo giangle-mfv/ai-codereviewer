@@ -154,12 +154,28 @@ async function getAIResponse(prompt: string): Promise<Array<{
       ],
     });
 
-    const res = response.choices[0].message?.content?.trim() || "{}";
+    var res = response.choices[0].message?.content?.trim() || "{}";
+    if (!isJSON(res)) {
+      return [{
+        "lineNumber": "1",
+        "reviewComment": res
+      }]
+    }
+
     return JSON.parse(res).reviews;
   } catch (error) {
     console.error("Error:", error);
     return null;
   }
+}
+
+function isJSON(text: string) {
+    try {
+        JSON.parse(text);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function createComment(
@@ -291,17 +307,17 @@ async function generatePrDescription() {
   const prompt = createPRDescriptionPrompt(diff);
   const aiResponse = await getAIResponse(prompt);
 
-  console.log("AI Response: ", aiResponse);
+  console.log("AI Response: ", JSON.stringify(aiResponse));
 
-  // if (aiResponse) {
-  //     await updatePullRequestDescription(
-  //         prDetails.owner,
-  //         prDetails.repo,
-  //         prDetails.pull_number,
-  //         prDetails.title,
-  //         aiResponse[0].reviewComment
-  //     );
-  // }
+  if (aiResponse) {
+      await updatePullRequestDescription(
+          prDetails.owner,
+          prDetails.repo,
+          prDetails.pull_number,
+          prDetails.title,
+          aiResponse[0].reviewComment
+      );
+  }
 }
 
 main().catch((error) => {

@@ -168,7 +168,13 @@ function getAIResponse(prompt) {
                         content: prompt,
                     },
                 ] }));
-            const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "{}";
+            var res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "{}";
+            if (!isJSON(res)) {
+                return [{
+                        "lineNumber": "1",
+                        "reviewComment": res
+                    }];
+            }
             return JSON.parse(res).reviews;
         }
         catch (error) {
@@ -176,6 +182,15 @@ function getAIResponse(prompt) {
             return null;
         }
     });
+}
+function isJSON(text) {
+    try {
+        JSON.parse(text);
+        return true;
+    }
+    catch (_a) {
+        return false;
+    }
 }
 function createComment(file, chunk, aiResponses) {
     return aiResponses.flatMap((aiResponse) => {
@@ -263,16 +278,10 @@ function generatePrDescription() {
         }
         const prompt = createPRDescriptionPrompt(diff);
         const aiResponse = yield getAIResponse(prompt);
-        console.log("AI Response: ", aiResponse);
-        // if (aiResponse) {
-        //     await updatePullRequestDescription(
-        //         prDetails.owner,
-        //         prDetails.repo,
-        //         prDetails.pull_number,
-        //         prDetails.title,
-        //         aiResponse[0].reviewComment
-        //     );
-        // }
+        console.log("AI Response: ", JSON.stringify(aiResponse));
+        if (aiResponse) {
+            yield updatePullRequestDescription(prDetails.owner, prDetails.repo, prDetails.pull_number, prDetails.title, aiResponse[0].reviewComment);
+        }
     });
 }
 main().catch((error) => {
