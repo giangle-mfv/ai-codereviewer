@@ -15,6 +15,10 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
+const REVIEW_LABEL = 'ai-review';
+const PR_DESC_LABEL = 'ai-pr-desc';
+const LABELED_ACTION = 'labeled';
+
 interface PRDetails {
   owner: string;
   repo: string;
@@ -65,7 +69,7 @@ async function analyzeCode(
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
-      const prompt = createPrompt(file, chunk, prDetails);
+      const prompt = createCodeReviewPrompt(file, chunk, prDetails);
       const aiResponse = await getAIResponse(prompt);
       if (aiResponse) {
         const newComments = createComment(file, chunk, aiResponse);
@@ -78,7 +82,7 @@ async function analyzeCode(
   return comments;
 }
 
-function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
+function createCodeReviewPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
   return `Your task is to review pull requests. Instructions:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
@@ -181,42 +185,53 @@ async function createReviewComment(
   });
 }
 
+async function updatePullRequestDescription(
+    owner: string,
+    repo: string,
+    pull_number: number,
+    title: string,
+    body: string
+) {
+  await octokit.pulls.update({
+    owner,
+    repo,
+    pull_number,
+    title,
+    body
+  });
+}
+
 async function main() {
-  const prDetails = await getPRDetails();
-  let diff: string | null;
   const eventData = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
 
-  console.log("data: " + JSON.stringify(eventData));
-  console.log("action: " + eventData.action);
-  console.log("event:", process.env.GITHUB_EVENT_NAME);
+  if (!eventData.action || eventData.action !== LABELED_ACTION) {
+    console.log("Unsupported action:", eventData.action ?? "none");
+  }
+
+  if (eventData.label.name && eventData.label.name !== REVIEW_LABEL && eventData.label.name !== PR_DESC_LABEL) {
+    console.log("Unsupported label:", eventData.label.name);
+  }
+
+  if (eventData.label.name === REVIEW_LABEL) {
+    await generateCodeReview();
+  }
+
+  if (eventData.label.name === PR_DESC_LABEL) {
+    await generatePrDescription();
+  }
+}
+
+async function generateCodeReview() {
+  const prDetails = await getPRDetails();
+  let diff: string | null;
 
   diff = await getDiff(
-    prDetails.owner,
-    prDetails.repo,
-    prDetails.pull_number
+      prDetails.owner,
+      prDetails.repo,
+      prDetails.pull_number
   );
-  // } else if (eventData.action === "synchronize") {
-  //   const newBaseSha = eventData.before;
-  //   const newHeadSha = eventData.after;
-  //
-  //   const response = await octokit.repos.compareCommits({
-  //     headers: {
-  //       accept: "application/vnd.github.v3.diff",
-  //     },
-  //     owner: prDetails.owner,
-  //     repo: prDetails.repo,
-  //     base: newBaseSha,
-  //     head: newHeadSha,
-  //   });
-  //
-  //   diff = String(response.data);
-  // } else {
-  //   console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
-  //   console.log("event:", eventData.action);
-  //   return;
-  // }
 
   if (!diff) {
     console.log("No diff found");
@@ -226,25 +241,37 @@ async function main() {
   const parsedDiff = parseDiff(diff);
 
   const excludePatterns = core
-    .getInput("exclude")
-    .split(",")
-    .map((s) => s.trim());
+      .getInput("exclude")
+      .split(",")
+      .map((s) => s.trim());
 
   const filteredDiff = parsedDiff.filter((file) => {
     return !excludePatterns.some((pattern) =>
-      minimatch(file.to ?? "", pattern)
+        minimatch(file.to ?? "", pattern)
     );
   });
 
   const comments = await analyzeCode(filteredDiff, prDetails);
   if (comments.length > 0) {
     await createReviewComment(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number,
-      comments
+        prDetails.owner,
+        prDetails.repo,
+        prDetails.pull_number,
+        comments
     );
   }
+}
+async function generatePrDescription() {
+  const prDetails = await getPRDetails();
+  let diff: string | null;
+
+  diff = await getDiff(
+      prDetails.owner,
+      prDetails.repo,
+      prDetails.pull_number
+  );
+
+  console.log("diff: " + JSON.stringify(diff));
 }
 
 main().catch((error) => {

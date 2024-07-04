@@ -55,6 +55,9 @@ const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 const openai = new openai_1.default({
     apiKey: OPENAI_API_KEY,
 });
+const REVIEW_LABEL = 'ai-review';
+const PR_DESC_LABEL = 'ai-pr-desc';
+const LABELED_ACTION = 'labeled';
 function getPRDetails() {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
@@ -92,7 +95,7 @@ function analyzeCode(parsedDiff, prDetails) {
             if (file.to === "/dev/null")
                 continue; // Ignore deleted files
             for (const chunk of file.chunks) {
-                const prompt = createPrompt(file, chunk, prDetails);
+                const prompt = createCodeReviewPrompt(file, chunk, prDetails);
                 const aiResponse = yield getAIResponse(prompt);
                 if (aiResponse) {
                     const newComments = createComment(file, chunk, aiResponse);
@@ -105,7 +108,7 @@ function analyzeCode(parsedDiff, prDetails) {
         return comments;
     });
 }
-function createPrompt(file, chunk, prDetails) {
+function createCodeReviewPrompt(file, chunk, prDetails) {
     return `Your task is to review pull requests. Instructions:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
@@ -186,36 +189,40 @@ function createReviewComment(owner, repo, pull_number, comments) {
         });
     });
 }
+function updatePullRequestDescription(owner, repo, pull_number, title, body) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield octokit.pulls.update({
+            owner,
+            repo,
+            pull_number,
+            title,
+            body
+        });
+    });
+}
 function main() {
-    var _a;
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        if (!eventData.action || eventData.action !== LABELED_ACTION) {
+            console.log("Unsupported action:", (_b = eventData.action) !== null && _b !== void 0 ? _b : "none");
+        }
+        if (eventData.label.name && eventData.label.name !== REVIEW_LABEL && eventData.label.name !== PR_DESC_LABEL) {
+            console.log("Unsupported label:", eventData.label.name);
+        }
+        if (eventData.label.name === REVIEW_LABEL) {
+            yield generateCodeReview();
+        }
+        if (eventData.label.name === PR_DESC_LABEL) {
+            yield generatePrDescription();
+        }
+    });
+}
+function generateCodeReview() {
     return __awaiter(this, void 0, void 0, function* () {
         const prDetails = yield getPRDetails();
         let diff;
-        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
-        console.log("data: " + JSON.stringify(eventData));
-        console.log("action: " + eventData.action);
-        console.log("event:", process.env.GITHUB_EVENT_NAME);
         diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        // } else if (eventData.action === "synchronize") {
-        //   const newBaseSha = eventData.before;
-        //   const newHeadSha = eventData.after;
-        //
-        //   const response = await octokit.repos.compareCommits({
-        //     headers: {
-        //       accept: "application/vnd.github.v3.diff",
-        //     },
-        //     owner: prDetails.owner,
-        //     repo: prDetails.repo,
-        //     base: newBaseSha,
-        //     head: newHeadSha,
-        //   });
-        //
-        //   diff = String(response.data);
-        // } else {
-        //   console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
-        //   console.log("event:", eventData.action);
-        //   return;
-        // }
         if (!diff) {
             console.log("No diff found");
             return;
@@ -232,6 +239,14 @@ function main() {
         if (comments.length > 0) {
             yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
         }
+    });
+}
+function generatePrDescription() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const prDetails = yield getPRDetails();
+        let diff;
+        diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+        console.log("diff: " + JSON.stringify(diff));
     });
 }
 main().catch((error) => {
