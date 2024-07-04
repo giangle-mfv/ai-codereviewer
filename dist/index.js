@@ -137,6 +137,23 @@ ${chunk.changes
 \`\`\`
 `;
 }
+function createPRDescriptionPrompt(diff, prDetails) {
+    return `
+  Your job is reading the following git diff and suggest me a description of the Pull Request. 
+  The description should be summary of what i've done, what is the output and what can be the impact to the existing code base.
+  
+  Pull request title: ${prDetails.title}
+  Pull request description:
+  ---
+  ${prDetails.description}
+  ---
+
+  Git diff are:
+  ---
+  ${diff}
+  ---
+  `;
+}
 function getAIResponse(prompt) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
@@ -246,7 +263,22 @@ function generatePrDescription() {
         const prDetails = yield getPRDetails();
         let diff;
         diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        console.log("diff: " + JSON.stringify(diff));
+        if (!diff) {
+            console.log("No diff found");
+            return;
+        }
+        const prompt = createPRDescriptionPrompt(diff, prDetails);
+        const aiResponse = yield getAIResponse(prompt);
+        console.log("AI Response: ", JSON.stringify(aiResponse));
+        // if (aiResponse) {
+        //     await updatePullRequestDescription(
+        //         prDetails.owner,
+        //         prDetails.repo,
+        //         prDetails.pull_number,
+        //         prDetails.title,
+        //         aiResponse[0].reviewComment
+        //     );
+        // }
     });
 }
 main().catch((error) => {
