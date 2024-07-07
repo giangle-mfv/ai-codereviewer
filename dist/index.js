@@ -1,7 +1,7 @@
 require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 3109:
+/***/ 7962:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -42,22 +42,103 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(7147);
-const core = __importStar(__nccwpck_require__(2186));
-const openai_1 = __importDefault(__nccwpck_require__(47));
-const rest_1 = __nccwpck_require__(5375);
+exports.generatePrDescription = exports.generateCodeReview = void 0;
+const github_1 = __nccwpck_require__(5928);
 const parse_diff_1 = __importDefault(__nccwpck_require__(4833));
+const core = __importStar(__nccwpck_require__(2186));
 const minimatch_1 = __importDefault(__nccwpck_require__(2002));
-const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
-const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
-const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
-const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
-const openai = new openai_1.default({
-    apiKey: OPENAI_API_KEY,
+const openai_1 = __nccwpck_require__(8561);
+const prompt_1 = __nccwpck_require__(2063);
+function generateCodeReview() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const prDetails = yield (0, github_1.getPRDetails)();
+        let diff;
+        diff = yield (0, github_1.getDiff)(prDetails.owner, prDetails.repo, prDetails.pull_number);
+        if (!diff) {
+            console.log("No diff found");
+            return;
+        }
+        const parsedDiff = (0, parse_diff_1.default)(diff);
+        const excludePatterns = core
+            .getInput("exclude")
+            .split(",")
+            .map((s) => s.trim());
+        const filteredDiff = parsedDiff.filter((file) => {
+            return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
+        });
+        const comments = yield (0, openai_1.analyzeCode)(filteredDiff, prDetails);
+        if (comments.length > 0) {
+            yield (0, github_1.createReviewComment)(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
+        }
+    });
+}
+exports.generateCodeReview = generateCodeReview;
+function generatePrDescription() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const prDetails = yield (0, github_1.getPRDetails)();
+        let diff;
+        diff = yield (0, github_1.getDiff)(prDetails.owner, prDetails.repo, prDetails.pull_number);
+        if (!diff) {
+            console.log("No diff found");
+            return;
+        }
+        const prompt = (0, prompt_1.createPRDescriptionPrompt)(diff);
+        const aiResponse = yield (0, openai_1.getAIResponse)(prompt);
+        console.log("AI Response: ", JSON.stringify(aiResponse));
+        if (aiResponse) {
+            yield (0, github_1.updatePullRequestDescription)(prDetails.owner, prDetails.repo, prDetails.pull_number, prDetails.title, aiResponse[0].reviewComment);
+        }
+    });
+}
+exports.generatePrDescription = generatePrDescription;
+
+
+/***/ }),
+
+/***/ 5928:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
 });
-const REVIEW_LABEL = 'ai-review';
-const PR_DESC_LABEL = 'ai-pr-desc';
-const LABELED_ACTION = 'labeled';
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.updatePullRequestDescription = exports.createReviewComment = exports.createComment = exports.getDiff = exports.getPRDetails = void 0;
+const fs_1 = __nccwpck_require__(7147);
+const rest_1 = __nccwpck_require__(5375);
+const core = __importStar(__nccwpck_require__(2186));
+const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
+const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 function getPRDetails() {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
@@ -76,6 +157,7 @@ function getPRDetails() {
         };
     });
 }
+exports.getPRDetails = getPRDetails;
 function getDiff(owner, repo, pull_number) {
     return __awaiter(this, void 0, void 0, function* () {
         const response = yield octokit.pulls.get({
@@ -88,66 +170,145 @@ function getDiff(owner, repo, pull_number) {
         return response.data;
     });
 }
-function analyzeCode(parsedDiff, prDetails) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const comments = [];
-        for (const file of parsedDiff) {
-            if (file.to === "/dev/null")
-                continue; // Ignore deleted files
-            for (const chunk of file.chunks) {
-                const prompt = createCodeReviewPrompt(file, chunk, prDetails);
-                const aiResponse = yield getAIResponse(prompt);
-                if (aiResponse) {
-                    const newComments = createComment(file, chunk, aiResponse);
-                    if (newComments) {
-                        comments.push(...newComments);
-                    }
-                }
-            }
+exports.getDiff = getDiff;
+function createComment(file, chunk, aiResponses) {
+    return aiResponses.flatMap((aiResponse) => {
+        if (!file.to) {
+            return [];
         }
-        return comments;
+        return {
+            body: aiResponse.reviewComment,
+            path: file.to,
+            line: Number(aiResponse.lineNumber),
+        };
     });
 }
-function createCodeReviewPrompt(file, chunk, prDetails) {
-    return `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
-- Do not give positive comments or compliments.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
-- Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
-- IMPORTANT: NEVER suggest adding comments to the code.
-
-Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
-  
-Pull request title: ${prDetails.title}
-Pull request description:
-
----
-${prDetails.description}
----
-
-Git diff to review:
-
-\`\`\`diff
-${chunk.content}
-${chunk.changes
-        // @ts-expect-error - ln and ln2 exists where needed
-        .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-        .join("\n")}
-\`\`\`
-`;
+exports.createComment = createComment;
+function createReviewComment(owner, repo, pull_number, comments) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number,
+            comments,
+            event: "COMMENT",
+        });
+    });
 }
-function createPRDescriptionPrompt(diff) {
-    return `
-  Your job is reading the following git diff and suggest me a description of the Pull Request. 
-  The description should be summary of what i've done, what is the output and what can be the impact to the existing code base.
-  
-  Git diff are:
-  ---
-  ${diff}
-  ---
-  `;
+exports.createReviewComment = createReviewComment;
+function updatePullRequestDescription(owner, repo, pull_number, title, body) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield octokit.pulls.update({
+            owner,
+            repo,
+            pull_number,
+            title,
+            body
+        });
+    });
 }
+exports.updatePullRequestDescription = updatePullRequestDescription;
+
+
+/***/ }),
+
+/***/ 3109:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(7147);
+const actionHandler_1 = __nccwpck_require__(7962);
+const REVIEW_LABEL = 'ai-review';
+const PR_DESC_LABEL = 'ai-pr-desc';
+const LABELED_ACTION = 'labeled';
+function main() {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        if (!eventData.action || eventData.action !== LABELED_ACTION) {
+            console.log("Unsupported action:", (_b = eventData.action) !== null && _b !== void 0 ? _b : "none");
+        }
+        if (eventData.label.name && eventData.label.name !== REVIEW_LABEL && eventData.label.name !== PR_DESC_LABEL) {
+            console.log("Unsupported label:", eventData.label.name);
+        }
+        if (eventData.label.name === REVIEW_LABEL) {
+            yield (0, actionHandler_1.generateCodeReview)();
+        }
+        if (eventData.label.name === PR_DESC_LABEL) {
+            yield (0, actionHandler_1.generatePrDescription)();
+        }
+    });
+}
+main().catch((error) => {
+    console.error("Error:", error);
+    process.exit(1);
+});
+
+
+/***/ }),
+
+/***/ 8561:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.analyzeCode = exports.getAIResponse = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const openai_1 = __importDefault(__nccwpck_require__(47));
+const prompt_1 = __nccwpck_require__(2063);
+const github_1 = __nccwpck_require__(5928);
+const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
+const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
+const openai = new openai_1.default({
+    apiKey: OPENAI_API_KEY,
+});
 function getAIResponse(prompt) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
@@ -183,6 +344,28 @@ function getAIResponse(prompt) {
         }
     });
 }
+exports.getAIResponse = getAIResponse;
+function analyzeCode(parsedDiff, prDetails) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const comments = [];
+        for (const file of parsedDiff) {
+            if (file.to === "/dev/null")
+                continue; // Ignore deleted files
+            for (const chunk of file.chunks) {
+                const prompt = (0, prompt_1.createCodeReviewPrompt)(file, chunk, prDetails);
+                const aiResponse = yield getAIResponse(prompt);
+                if (aiResponse) {
+                    const newComments = (0, github_1.createComment)(file, chunk, aiResponse);
+                    if (newComments) {
+                        comments.push(...newComments);
+                    }
+                }
+            }
+        }
+        return comments;
+    });
+}
+exports.analyzeCode = analyzeCode;
 function isJSON(text) {
     try {
         JSON.parse(text);
@@ -192,102 +375,76 @@ function isJSON(text) {
         return false;
     }
 }
-function createComment(file, chunk, aiResponses) {
-    return aiResponses.flatMap((aiResponse) => {
-        if (!file.to) {
-            return [];
-        }
-        return {
-            body: aiResponse.reviewComment,
-            path: file.to,
-            line: Number(aiResponse.lineNumber),
-        };
-    });
+
+
+/***/ }),
+
+/***/ 2063:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createPRDescriptionPrompt = exports.createCodeReviewPrompt = void 0;
+function createCodeReviewPrompt(file, chunk, prDetails) {
+    return `Your task is to review pull requests. Instructions:
+- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
+- Do not give positive comments or compliments.
+- Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
+- Write the comment in GitHub Markdown format.
+- Use the given description only for the overall context and only comment the code.
+- IMPORTANT: NEVER suggest adding comments to the code.
+
+Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
+  
+Pull request title: ${prDetails.title}
+Pull request description:
+
+---
+${prDetails.description}
+---
+
+Git diff to review:
+
+\`\`\`diff
+${chunk.content}
+${chunk.changes
+        // @ts-expect-error - ln and ln2 exists where needed
+        .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
+        .join("\n")}
+\`\`\`
+`;
 }
-function createReviewComment(owner, repo, pull_number, comments) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield octokit.pulls.createReview({
-            owner,
-            repo,
-            pull_number,
-            comments,
-            event: "COMMENT",
-        });
-    });
+exports.createCodeReviewPrompt = createCodeReviewPrompt;
+function createPRDescriptionPrompt(diff) {
+    return `
+  Your job is reading the following git diff and suggest me a description of the Pull Request. 
+  The description should be summary of what i've done, what is the output and what can be the impact to the existing code base.
+  INSTRUCTIONS:
+    - Provide the response in markdown format
+    - Use the following template for the PR description:
+    1. **Why this PR is needed**
+      https://moneyforwardvietnam.atlassian.net/browse/SCI-
+    2. **What I did in this PR**
+
+    3. **How to check**
+
+    4. **Checklist**
+
+      - [] Pass all current \`unit-test\`
+      - [] I have performed a \`self-review\` and \`test\` of my code
+      - [] Check sql generated (if have) to ensure \`perf issue\`
+      - [] Do you have any \`new properties\`? If then you need to create properties
+      on: \`task_definition_app.json\`, \`task_definition_app_beta.json\` and \`AWS paramStore\`
+      - [] If this is PR to \`STG/PROD\` plz prepare \`liquibase script\`
+  
+  Git diff are:
+  ---
+  ${diff}
+  ---
+  `;
 }
-function updatePullRequestDescription(owner, repo, pull_number, title, body) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield octokit.pulls.update({
-            owner,
-            repo,
-            pull_number,
-            title,
-            body
-        });
-    });
-}
-function main() {
-    var _a, _b;
-    return __awaiter(this, void 0, void 0, function* () {
-        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
-        if (!eventData.action || eventData.action !== LABELED_ACTION) {
-            console.log("Unsupported action:", (_b = eventData.action) !== null && _b !== void 0 ? _b : "none");
-        }
-        if (eventData.label.name && eventData.label.name !== REVIEW_LABEL && eventData.label.name !== PR_DESC_LABEL) {
-            console.log("Unsupported label:", eventData.label.name);
-        }
-        if (eventData.label.name === REVIEW_LABEL) {
-            yield generateCodeReview();
-        }
-        if (eventData.label.name === PR_DESC_LABEL) {
-            yield generatePrDescription();
-        }
-    });
-}
-function generateCodeReview() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prDetails = yield getPRDetails();
-        let diff;
-        diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        if (!diff) {
-            console.log("No diff found");
-            return;
-        }
-        const parsedDiff = (0, parse_diff_1.default)(diff);
-        const excludePatterns = core
-            .getInput("exclude")
-            .split(",")
-            .map((s) => s.trim());
-        const filteredDiff = parsedDiff.filter((file) => {
-            return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
-        });
-        const comments = yield analyzeCode(filteredDiff, prDetails);
-        if (comments.length > 0) {
-            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
-        }
-    });
-}
-function generatePrDescription() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prDetails = yield getPRDetails();
-        let diff;
-        diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        if (!diff) {
-            console.log("No diff found");
-            return;
-        }
-        const prompt = createPRDescriptionPrompt(diff);
-        const aiResponse = yield getAIResponse(prompt);
-        console.log("AI Response: ", JSON.stringify(aiResponse));
-        if (aiResponse) {
-            yield updatePullRequestDescription(prDetails.owner, prDetails.repo, prDetails.pull_number, prDetails.title, aiResponse[0].reviewComment);
-        }
-    });
-}
-main().catch((error) => {
-    console.error("Error:", error);
-    process.exit(1);
-});
+exports.createPRDescriptionPrompt = createPRDescriptionPrompt;
 
 
 /***/ }),
